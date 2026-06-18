@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BMS Rating Calculator Web</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f4f6f9; color: #333; margin: 0; padding: 20px; }
+        .container { max-width: 950px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        h1 { text-align: center; color: #2c3e50; margin-bottom: 5px; }
+        .subtitle { text-align: center; color: #7f8c8d; margin-bottom: 30px; }
+        
+        /* ファイル選択エリアのスタイル */
+        .upload-section { background: #f8f9fa; border: 2px dashed #cbd5e1; padding: 20px; border-radius: 6px; text-align: center; margin-bottom: 25px; }
+        .upload-section input { display: none; }
+        .upload-btn { background: #2196F3; color: white; padding: 10px 20px; border-radius: 4px; font-weight: bold; cursor: pointer; display: inline-block; margin-top: 10px; }
+        .upload-btn:hover { background: #1e88e5; }
+        #file-status { margin-top: 10px; font-size: 14px; color: #475569; font-weight: bold; }
+
+        .score-box { text-align: center; background: #eef9f0; border: 2px solid #d4eed8; padding: 20px; border-radius: 6px; margin-bottom: 30px; display: none; }
+        .score-box h2 { margin: 0; font-size: 16px; color: #27ae60; }
+        .score-box .rating-value { font-size: 48px; font-weight: bold; color: #2196F3; margin: 10px 0 0 0; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; display: none; }
+        th { background-color: #f8f9fa; color: #6c757d; font-weight: 600; padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6; }
+        td { padding: 12px; border-bottom: 1px solid #dee2e6; font-size: 14px; }
+        tr:hover { background-color: #f8f9fa; }
+        .center { text-align: center; }
+        .rank { font-weight: bold; color: #7f8c8d; text-align: center; width: 40px; }
+        .level-tag { font-weight: bold; color: #e74c3c; width: 60px; }
+        .title { font-weight: 500; color: #2c3e50; }
+        .single-rate { font-weight: bold; color: #2196F3; }
+        .loading { text-align: center; font-weight: bold; color: #ff9800; margin: 20px 0; display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>BMS レーティング結果</h1>
+    <div class="subtitle">Web Best 50 リザルトレポート</div>
+    
+    <div class="upload-section">
+        <p>score.db、scorelog.db、または LR2.db を選んでください（サーバー送信なし）</p>
+        <label class="upload-btn">
+            ファイルを選択
+            <input type="file" id="dbfile" accept=".db">
+        </label>
+        <div id="file-status">SQL.js 初期化中...</div>
+    </div>
+
+    <div class="loading" id="loading-text">データを解析中...しばらくお待ちください</div>
+
+    <div class="score-box" id="result-box">
+        <h2>総合レーティング (Best 50合計)</h2>
+        <div class="rating-value" id="total-rating">---</div>
+    </div>
+    
+    <table id="result-table">
+        <thead>
+            <tr>
+                <th class="center">順位</th>
+                <th class="center">難易度</th>
+                <th>曲名</th>
+                <th class="center">スコア率</th>
+                <th class="center">難易度定数</th>
+                <th class="center">単曲レート</th>
+            </tr>
+        </thead>
+        <tbody id="table-body">
+            </tbody>
+    </table>
+</div>
+
+<script>
+    let SQL;
+    let csvData =
