@@ -90,22 +90,18 @@
         }
 
         // 1. 譜面定数CSVの読み込み
-        try {
-            Papa.parse("hakkyoudata.csv", {
-                download: true,
-                header: true,
-                complete: function(results) {
-                    csvData = results.data;
-                    isCsvReady = true;
-                    checkReadyStatus();
-                },
-                error: function(err) {
-                    statusEl.innerText = "【エラー】hakkyoudata.csv の読み込みに失敗しました。ファイルが同じ場所にありますか？";
-                }
-            });
-        } catch(e) {
-            statusEl.innerText = "【エラー】CSV読み込みフェーズで例外が発生しました: " + e.message;
-        }
+        Papa.parse("hakkyoudata.csv", {
+            download: true,
+            header: true,
+            complete: function(results) {
+                csvData = results.data;
+                isCsvReady = true;
+                checkReadyStatus();
+            },
+            error: function(err) {
+                statusEl.innerText = "【エラー】hakkyoudata.csv の読み込みに失敗しました。";
+            }
+        });
 
         // 2. sql.js の初期化
         if (typeof initSqlJs !== 'undefined') {
@@ -117,7 +113,7 @@
                 statusEl.innerText = "【エラー】SQLエンジンの初期化に失敗しました: " + err.message;
             });
         } else {
-            statusEl.innerText = "【エラー】外部パーツ(sql-wasm.js)の読み込みがブラウザによってブロックされました。";
+            statusEl.innerText = "【エラー】外部パーツの読み込みがブロックされました。";
         }
 
         function calcSingleRating(exScore, maxScore, difficulty) {
@@ -142,26 +138,72 @@
                 const Uints = new Uint8Array(reader.result);
                 try {
                     const db = new SQL.Database(Uints);
+                    
+                    // テーブル一覧の取得
                     const tableRes = db.exec("SELECT name FROM sqlite_master WHERE type='table';");
                     if (tableRes.length === 0) {
                         alert("有効なSQLiteデータベースではありません。");
+                        document.getElementById('loading-text').style.display = "none";
                         return;
                     }
                     const tables = tableRes[0].values.map(row => row[0].toLowerCase());
-                    let query = "";
                     
-                    if (tables.includes("scorelog")) {
-                        query = "SELECT sha256 as bms_hash, MAX(CAST(epg AS INTEGER) * 2 + CAST(great AS INTEGER)) as ex_score FROM scorelog GROUP BY sha256";
-                    } else if (tables.includes("score")) {
-                        query = "SELECT sha256 as bms_hash, (CAST(epg AS INTEGER) * 2 + CAST(great AS INTEGER)) as ex_score FROM score";
-                    } else if (tables.includes("clear")) {
-                        query = "SELECT hash as bms_hash, (CAST(pgreat AS INTEGER) * 2 + CAST(great AS INTEGER)) as ex_score FROM clear";
-                    } else {
-                        alert("対応していないデータベース形式、またはスコアデータが空です。");
+                    let targetTable = "";
+                    if (tables.includes("scorelog")) targetTable = "scorelog";
+                    else if (tables.includes("score")) targetTable = "score";
+                    else if (tables.includes("clear")) targetTable = "clear";
+                    
+                    if (!targetTable) {
+                        alert("対応するスコアテーブル（scorelog, score, clear）が見つかりません。");
                         document.getElementById('loading-text').style.display = "none";
                         return;
                     }
 
+                    // テーブル内のカラム（列）名一覧を取得して、最適な判定列を自動判別
+                    const colRes = db.exec(`PRAGMA table_info(${targetTable});`);
+                    const existingCols = colRes[0].values.map(row => row[1].toLowerCase());
+                    
+                    // ハッシュ列の特定
+                    let hashCol = "sha256";
+                    if (existingCols.includes("hash")) hashCol = "hash";
+
+                    // PGREAT(最高判定)列の特定
+                    let pgCol = "";
+                    for (let target of ['epg', 'perfect', 'pgreat']) {
+                        if (existingCols.includes(target)) { pgCol = target; break; }
+                    }
+
+                    // GREAT(第二判定)列の特定
+                    let grCol = "";
+                    for (let target of ['eg', 'great']) {
+                        if (existingCols.includes(target)) { grCol = target; break; }
+                    }
+
+                    let query = "";
+                    
+                    // PGREATとGREATのカラムが揃っている場合
+                    if (pgCol && grCol) {
+                        if (targetTable === "scorelog") {
+                            query = `SELECT ${hashCol} as bms_hash, MAX(CAST(${pgCol} AS INTEGER) * 2 + CAST(${grCol} AS INTEGER)) as ex_score FROM scorelog GROUP BY ${hashCol}`;
+                        } else {
+                            query = `SELECT ${hashCol} as bms_hash, (CAST(${pgCol} AS INTEGER) * 2 + CAST(${grCol} AS INTEGER)) as ex_score FROM ${targetTable}`;
+                        }
+                    } else {
+                        // 万が一判定列がバラバラで取得できない場合のフォールバック（直接exscoreやscore等の合計列を探す）
+                        let fallbackCol = "";
+                        for (let target of ['exscore', 'ep', 'score', 'ex_score']) {
+                            if (existingCols.includes(target)) { fallbackCol = target; break; }
+                        }
+                        if (!fallbackCol) fallbackCol = existingCols[1] || existingCols[0]; // 最悪2番目の列をスコアと仮定
+                        
+                        if (targetTable === "scorelog") {
+                            query = `SELECT ${hashCol} as bms_hash, MAX(CAST(${fallbackCol} AS INTEGER)) as ex_score FROM scorelog GROUP BY ${hashCol}`;
+                        } else {
+                            query = `SELECT ${hashCol} as bms_hash, CAST(${fallbackCol} AS INTEGER) as ex_score FROM ${targetTable}`;
+                        }
+                    }
+
+                    // SQL実行
                     const dbResult = db.exec(query);
                     let userScores = {};
                     if (dbResult.length > 0) {
@@ -173,6 +215,7 @@
                         });
                     }
 
+                    // CSVとのマッピング処理
                     let calculatedList = [];
                     csvData.forEach(item => {
                         let hash = item.sha256 ? item.sha256.toLowerCase() : "";
@@ -198,7 +241,7 @@
                     let best50 = calculatedList.slice(0, 50);
 
                     if (best50.length === 0) {
-                        alert("CSVデータと一致するスコアが1曲も見つかりませんでした。");
+                        alert("CSVデータと一致するスコアが1曲も見つかりませんでした。DB内に有効なプレイデータがあるか確認してください。");
                         document.getElementById('loading-text').style.display = "none";
                         return;
                     }
