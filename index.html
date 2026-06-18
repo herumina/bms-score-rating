@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BMS Rating Calculator Web</title>
+    <title>発狂難易度レーティング計算機β</title>
     <script src="sql-wasm.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <style>
@@ -25,7 +25,7 @@
         tr:hover { background-color: #f8f9fa; }
         .center { text-align: center; }
         .rank { font-weight: bold; color: #7f8c8d; text-align: center; width: 40px; }
-        .level-tag { font-weight: bold; color: #e74c3c; width: 60px; }
+        .level-tag { font-weight: bold; color: #2196F3; width: 60px; }
         .title { font-weight: 500; color: #2c3e50; }
         .single-rate { font-weight: bold; color: #2196F3; }
         .loading { text-align: center; font-weight: bold; color: #ff9800; margin: 20px 0; display: none; }
@@ -34,11 +34,11 @@
 <body>
 
 <div class="container">
-    <h1>BMS レーティング結果</h1>
-    <div class="subtitle">Web Best 50 リザルトレポート</div>
+    <h1>発狂難易度レーティング計算機β</h1>
+    <div class="subtitle">発狂難易度表のAAA、MAX-埋めのモチベーションを上げたい人のための</div>
     
     <div class="upload-section">
-        <p>score.db、scorelog.db、または LR2.db を選んでください（サーバー送信なし）</p>
+        <p>LR2の場合は、名前.db  orajaの場合はscorelog.dbを選んでください</p>
         <label class="upload-btn">
             ファイルを選択
             <input type="file" id="dbfile" accept=".db">
@@ -60,7 +60,7 @@
                 <th class="center">難易度</th>
                 <th>曲名</th>
                 <th class="center">スコア率</th>
-                <th class="center">難易度定数</th>
+                <th class="center">譜面定数</th>
                 <th class="center">単曲レート</th>
             </tr>
         </thead>
