@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BMS Rating Calculator Web</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="sql-wasm.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <style>
         body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f4f6f9; color: #333; margin: 0; padding: 20px; }
@@ -103,15 +103,17 @@
             }
         });
 
-        // 2. sql.js の初期化
+        // 2. 自分のリポジトリ内にあるファイルから sql.js を初期化
         if (typeof initSqlJs !== 'undefined') {
-            initSqlJs({ locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}` }).then(function(js){
+            initSqlJs({ locateFile: file => file }).then(function(js){
                 SQL = js;
                 isSqlReady = true;
                 checkReadyStatus();
             }).catch(function(err) {
                 statusEl.innerText = "【エラー】SQLエンジンの初期化に失敗しました: " + err.message;
             });
+        } else {
+            statusEl.innerText = "【エラー】sql-wasm.js が正しく読み込めていません。同階層にファイルを配置してください。";
         }
 
         function calcSingleRating(exScore, maxScore, difficulty) {
@@ -159,6 +161,131 @@
                     const colRes = db.exec(`PRAGMA table_info(${targetTable});`);
                     const existingCols = colRes[0].values.map(row => row[1].toLowerCase());
                     
-                    // 1. ハッシュ列の特定 (LR2は 'hash'、beatorajaは 'sha256')
                     let hashCol = "sha256";
                     if (existingCols.includes("hash")) hashCol = "hash";
+
+                    let pgCol = "";
+                    for (let target of ['epg', 'perfect', 'pgreat']) {
+                        if (existingCols.includes(target)) { pgCol = target; break; }
+                    }
+                    let grCol = "";
+                    for (let target of ['eg', 'great']) {
+                        if (existingCols.includes(target)) { grCol = target; break; }
+                    }
+
+                    let query = "";
+                    if (pgCol && grCol) {
+                        if (targetTable === "scorelog") {
+                            query = `SELECT ${hashCol} as bms_hash, MAX(CAST(${pgCol} AS INTEGER) * 2 + CAST(${grCol} AS INTEGER)) as ex_score FROM scorelog GROUP BY ${hashCol}`;
+                        } else {
+                            query = `SELECT ${hashCol} as bms_hash, (CAST(${pgCol} AS INTEGER) * 2 + CAST(${grCol} AS INTEGER)) as ex_score FROM ${targetTable}`;
+                        }
+                    } else {
+                        let fallbackCol = "";
+                        for (let target of ['exscore', 'ep', 'score', 'ex_score']) {
+                            if (existingCols.includes(target)) { fallbackCol = target; break; }
+                        }
+                        if (!fallbackCol) fallbackCol = existingCols[1] || existingCols[0];
+                        
+                        if (targetTable === "scorelog") {
+                            query = `SELECT ${hashCol} as bms_hash, MAX(CAST(${fallbackCol} AS INTEGER)) as ex_score FROM scorelog GROUP BY ${hashCol}`;
+                        } else {
+                            query = `SELECT ${hashCol} as bms_hash, CAST(${fallbackCol} AS INTEGER) as ex_score FROM ${targetTable}`;
+                        }
+                    }
+
+                    const dbResult = db.exec(query);
+                    let userScores = {};
+                    let isMd5Mode = false;
+
+                    if (dbResult.length > 0) {
+                        const rows = dbResult[0].values;
+                        rows.forEach(row => {
+                            let hash = row[0] ? row[0].toLowerCase().trim() : "";
+                            let exScore = parseInt(row[1]) || 0;
+                            if(hash) {
+                                userScores[hash] = exScore;
+                                if (hash.length === 32) isMd5Mode = true;
+                            }
+                        });
+                    }
+
+                    let calculatedList = [];
+                    let csvKeys = csvData.length > 0 ? Object.keys(csvData[0]).map(k => k.toLowerCase()) : [];
+                    let csvHashKey = "sha256";
+                    if (isMd5Mode) {
+                        if (csvKeys.includes("md5")) csvHashKey = "md5";
+                        else if (csvKeys.includes("hash")) csvHashKey = "hash";
+                    }
+
+                    csvData.forEach(item => {
+                        let rawKey = Object.keys(item).find(k => k.toLowerCase() === csvHashKey) || "sha256";
+                        let hash = item[rawKey] ? item[rawKey].toLowerCase().trim() : "";
+                        
+                        if (userScores[hash] !== undefined) {
+                            let exScore = userScores[hash];
+                            let maxScore = parseFloat(item.max_score) || 0;
+                            let difficulty = parseFloat(item.difficulty) || 0;
+                            let singleRating = calcSingleRating(exScore, maxScore, difficulty);
+                            if (singleRating > 0) {
+                                calculatedList.push({
+                                    level: item.level || "-",
+                                    title: item.title || "Unknown Title",
+                                    ex_score: exScore,
+                                    max_score: maxScore,
+                                    difficulty: difficulty,
+                                    single_rating: singleRating
+                                });
+                            }
+                        }
+                    });
+
+                    calculatedList.sort((a, b) => b.single_rating - a.single_rating);
+                    let best50 = calculatedList.slice(0, 50);
+
+                    if (best50.length === 0) {
+                        let errorMsg = "CSVデータと一致するスコアが1曲も見つかりませんでした。\n\n";
+                        if (isMd5Mode) {
+                            errorMsg += "【原因の可能性】LR2.dbが読み込まれましたが、'hakkyoudata.csv' 側に 'md5'（または 'hash'）という列が存在しないか、空欄になっている可能性があります。";
+                        } else {
+                            errorMsg += "beatorajaのDBが読み込まれましたが、CSV側の 'sha256' 列と一致しませんでした。";
+                        }
+                        alert(errorMsg);
+                        document.getElementById('loading-text').style.display = "none";
+                        return;
+                    }
+
+                    let totalRating = 0;
+                    let tableHtml = "";
+                    best50.forEach((row, index) => {
+                        totalRating += row.single_rating;
+                        let ratePercent = ((row.ex_score / row.max_score) * 100).toFixed(2);
+                        tableHtml += `
+                            <tr>
+                                <td class="rank">${index + 1}</td>
+                                <td class="center level-tag">${row.level}</td>
+                                <td class="title">${row.title}</td>
+                                <td class="center">${ratePercent}%</td>
+                                <td class="center">${row.difficulty}</td>
+                                <td class="center single-rate">${row.single_rating.toFixed(4)}</td>
+                            </tr>
+                        `;
+                    });
+
+                    document.getElementById('total-rating').innerText = Math.floor(totalRating);
+                    document.getElementById('table-body').innerHTML = tableHtml;
+                    document.getElementById('result-box').style.display = "block";
+                    document.getElementById('result-table').style.display = "table";
+                    document.getElementById('loading-text').style.display = "none";
+
+                } catch (error) {
+                    alert("解析中にエラーが発生しました:\n" + error.message);
+                    document.getElementById('loading-text').style.display = "none";
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        });
+    });
+</script>
+</body>
+</html>
