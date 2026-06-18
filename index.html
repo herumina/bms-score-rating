@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BMS Rating Calculator Web</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js" crossorigin="anonymous"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <style>
         body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f4f6f9; color: #333; margin: 0; padding: 20px; }
         .container { max-width: 950px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
@@ -15,7 +15,7 @@
         .upload-section input { display: none; }
         .upload-btn { background: #2196F3; color: white; padding: 10px 20px; border-radius: 4px; font-weight: bold; cursor: pointer; display: inline-block; margin-top: 10px; }
         .upload-btn:hover { background: #1e88e5; }
-        #file-status { margin-top: 10px; font-size: 14px; color: #475569; font-weight: bold; }
+        #file-status { margin-top: 10px; font-size: 14px; color: #e67e22; font-weight: bold; }
         .score-box { text-align: center; background: #eef9f0; border: 2px solid #d4eed8; padding: 20px; border-radius: 6px; margin-bottom: 30px; display: none; }
         .score-box h2 { margin: 0; font-size: 16px; color: #27ae60; }
         .score-box .rating-value { font-size: 48px; font-weight: bold; color: #2196F3; margin: 10px 0 0 0; }
@@ -43,7 +43,7 @@
             ファイルを選択
             <input type="file" id="dbfile" accept=".db">
         </label>
-        <div id="file-status">システム初期化中...</div>
+        <div id="file-status">【状況】プログラムを起動しています...</div>
     </div>
 
     <div class="loading" id="loading-text">データを解析中...しばらくお待ちください</div>
@@ -69,49 +69,171 @@
 </div>
 
 <script>
-    let SQL = null;
-    let csvData = [];
-    let isCsvReady = false;
-    let isSqlReady = false;
+    window.addEventListener('DOMContentLoaded', (event) => {
+        let SQL = null;
+        let csvData = [];
+        let isCsvReady = false;
+        let isSqlReady = false;
 
-    // 1. 譜面定数CSVの読み込み
-    Papa.parse("hakkyoudata.csv", {
-        download: true,
-        header: true,
-        complete: function(results) {
-            csvData = results.data;
-            isCsvReady = true;
-            console.log("CSVロード成功");
-            checkReadyStatus();
-        },
-        error: function(err) {
-            console.error("CSVロードエラー:", err);
-            document.getElementById('file-status').innerText = "エラー: hakkyoudata.csv の読み込みに失敗しました。ファイル名が正しいか、同じ場所に置いてあるか確認してください。";
+        const statusEl = document.getElementById('file-status');
+
+        function checkReadyStatus() {
+            if (isSqlReady && isCsvReady) {
+                statusEl.style.color = "#27ae60";
+                statusEl.innerText = "【準備完了！】.dbファイルを選択してください。";
+            } else {
+                let statusText = "【初期化中】 ";
+                if (!isSqlReady) statusText += "[SQLエンジン読み込み中...] ";
+                if (!isCsvReady) statusText += "[定数CSVデータ読み込み中...] ";
+                statusEl.innerText = statusText;
+            }
         }
-    });
 
-    // 2. sql.js を初期化
-    initSqlJs({ locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}` }).then(function(js){
-        SQL = js;
-        isSqlReady = true;
-        console.log("SQL初期化成功");
-        checkReadyStatus();
-    }).catch(function(err) {
-        console.error("SQL初期化エラー:", err);
-        document.getElementById('file-status').innerText = "エラー: SQLエンジンの初期化に失敗しました。";
-    });
+        // 1. 譜面定数CSVの読み込み
+        try {
+            Papa.parse("hakkyoudata.csv", {
+                download: true,
+                header: true,
+                complete: function(results) {
+                    csvData = results.data;
+                    isCsvReady = true;
+                    checkReadyStatus();
+                },
+                error: function(err) {
+                    statusEl.innerText = "【エラー】hakkyoudata.csv の読み込みに失敗しました。ファイルが同じ場所にありますか？";
+                }
+            });
+        } catch(e) {
+            statusEl.innerText = "【エラー】CSV読み込みフェーズで例外が発生しました: " + e.message;
+        }
 
-    function checkReadyStatus() {
-        if (isSqlReady && isCsvReady) {
-            document.getElementById('file-status').innerText = "準備完了！.dbファイルを選択してください。";
+        // 2. sql.js の初期化
+        if (typeof initSqlJs !== 'undefined') {
+            initSqlJs({ locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}` }).then(function(js){
+                SQL = js;
+                isSqlReady = true;
+                checkReadyStatus();
+            }).catch(function(err) {
+                statusEl.innerText = "【エラー】SQLエンジンの初期化に失敗しました: " + err.message;
+            });
         } else {
-            let statusText = "初期化中: ";
-            if (!isSqlReady) statusText += "[SQLエンジン読み込み中...] ";
-            if (!isCsvReady) statusText += "[定数CSVデータ読み込み中...] ";
-            document.getElementById('file-status').innerText = statusText;
+            statusEl.innerText = "【エラー】外部パーツ(sql-wasm.js)の読み込みがブラウザによってブロックされました。";
         }
-    }
 
-    function calcSingleRating(exScore, maxScore, difficulty) {
-        if (!exScore || !maxScore || !difficulty || maxScore == 0 || exScore == 0) return 0;
-        let rate = (exScore / maxScore) * 100
+        function calcSingleRating(exScore, maxScore, difficulty) {
+            if (!exScore || !maxScore || !difficulty || maxScore == 0 || exScore == 0) return 0;
+            let rate = (exScore / maxScore) * 100;
+            let base = (difficulty * rate / 100.0) + ((rate - 88.8888) * 0.5);
+            let b1 = (rate >= 88.8888) ? 1.5 : 0.0;
+            let b2 = (rate >= 94.4444) ? 1.5 : 0.0;
+            let b3 = (rate >= 99.0000) ? 2.0 : 0.0;
+            return base + b1 + b2 + b3;
+        }
+
+        document.getElementById('dbfile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file || !SQL) return;
+
+            statusEl.innerText = "選択されたファイル: " + file.name;
+            document.getElementById('loading-text').style.display = "block";
+
+            const reader = new FileReader();
+            reader.onload = function() {
+                const Uints = new Uint8Array(reader.result);
+                try {
+                    const db = new SQL.Database(Uints);
+                    const tableRes = db.exec("SELECT name FROM sqlite_master WHERE type='table';");
+                    if (tableRes.length === 0) {
+                        alert("有効なSQLiteデータベースではありません。");
+                        return;
+                    }
+                    const tables = tableRes[0].values.map(row => row[0].toLowerCase());
+                    let query = "";
+                    
+                    if (tables.includes("scorelog")) {
+                        query = "SELECT sha256 as bms_hash, MAX(CAST(epg AS INTEGER) * 2 + CAST(great AS INTEGER)) as ex_score FROM scorelog GROUP BY sha256";
+                    } else if (tables.includes("score")) {
+                        query = "SELECT sha256 as bms_hash, (CAST(epg AS INTEGER) * 2 + CAST(great AS INTEGER)) as ex_score FROM score";
+                    } else if (tables.includes("clear")) {
+                        query = "SELECT hash as bms_hash, (CAST(pgreat AS INTEGER) * 2 + CAST(great AS INTEGER)) as ex_score FROM clear";
+                    } else {
+                        alert("対応していないデータベース形式、またはスコアデータが空です。");
+                        document.getElementById('loading-text').style.display = "none";
+                        return;
+                    }
+
+                    const dbResult = db.exec(query);
+                    let userScores = {};
+                    if (dbResult.length > 0) {
+                        const rows = dbResult[0].values;
+                        rows.forEach(row => {
+                            let hash = row[0] ? row[0].toLowerCase() : "";
+                            let exScore = parseInt(row[1]) || 0;
+                            userScores[hash] = exScore;
+                        });
+                    }
+
+                    let calculatedList = [];
+                    csvData.forEach(item => {
+                        let hash = item.sha256 ? item.sha256.toLowerCase() : "";
+                        if (userScores[hash] !== undefined) {
+                            let exScore = userScores[hash];
+                            let maxScore = parseFloat(item.max_score) || 0;
+                            let difficulty = parseFloat(item.difficulty) || 0;
+                            let singleRating = calcSingleRating(exScore, maxScore, difficulty);
+                            if (singleRating > 0) {
+                                calculatedList.push({
+                                    level: item.level || "-",
+                                    title: item.title || "Unknown Title",
+                                    ex_score: exScore,
+                                    max_score: maxScore,
+                                    difficulty: difficulty,
+                                    single_rating: singleRating
+                                });
+                            }
+                        }
+                    });
+
+                    calculatedList.sort((a, b) => b.single_rating - a.single_rating);
+                    let best50 = calculatedList.slice(0, 50);
+
+                    if (best50.length === 0) {
+                        alert("CSVデータと一致するスコアが1曲も見つかりませんでした。");
+                        document.getElementById('loading-text').style.display = "none";
+                        return;
+                    }
+
+                    let totalRating = 0;
+                    let tableHtml = "";
+                    best50.forEach((row, index) => {
+                        totalRating += row.single_rating;
+                        let ratePercent = ((row.ex_score / row.max_score) * 100).toFixed(2);
+                        tableHtml += `
+                            <tr>
+                                <td class="rank">${index + 1}</td>
+                                <td class="center level-tag">${row.level}</td>
+                                <td class="title">${row.title}</td>
+                                <td class="center">${ratePercent}%</td>
+                                <td class="center">${row.difficulty}</td>
+                                <td class="center single-rate">${row.single_rating.toFixed(4)}</td>
+                            </tr>
+                        `;
+                    });
+
+                    document.getElementById('total-rating').innerText = Math.floor(totalRating);
+                    document.getElementById('table-body').innerHTML = tableHtml;
+                    document.getElementById('result-box').style.display = "block";
+                    document.getElementById('result-table').style.display = "table";
+                    document.getElementById('loading-text').style.display = "none";
+
+                } catch (error) {
+                    alert("解析中にエラーが発生しました:\n" + error.message);
+                    document.getElementById('loading-text').style.display = "none";
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        });
+    });
+</script>
+</body>
+</html>
