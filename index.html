@@ -326,6 +326,7 @@
                 header: true,
                 skipEmptyLines: true,
                 complete: function (results) {
+                    console.log("CSV load complete. Row count:", results.data.length);
                     // カラム名の空白やBOMを考慮してデータを正規化
                     csvData = results.data.map(row => {
                         const newRow = {};
@@ -333,11 +334,20 @@
                             newRow[key.trim()] = row[key];
                         });
                         return newRow;
-                    }).filter(row => row.title || row.title_en); // titleがあれば有効
+                    }).filter(row => row.title || row.title_en);
+
+                    console.log("Filtered CSV count:", csvData.length);
 
                     if (csvData.length === 0) {
                         console.error("CSV data is empty or could not be parsed.");
                         statusEl.innerText = "【警告】CSVデータが空、または解析できませんでした。";
+                    } else {
+                        // デバッグ用に読み込み件数を追加表示
+                        const debugInfo = document.createElement('div');
+                        debugInfo.style.fontSize = "12px";
+                        debugInfo.style.color = "#999";
+                        debugInfo.innerText = `（譜面データ: ${csvData.length}件 読み込み完了）`;
+                        statusEl.appendChild(debugInfo);
                     }
 
                     isCsvReady = true;
