@@ -100,7 +100,6 @@
             width: 100%;
             border-collapse: collapse;
             margin-top: 10px;
-            display: none;
         }
 
         th {
@@ -263,7 +262,7 @@
                 </div>
             </div>
 
-            <table id="result-table">
+            <table id="result-table" style="display: none;">
                 <thead>
                     <tr>
                         <th class="center">順位</th>
@@ -283,7 +282,7 @@
             <div class="search-container">
                 <input type="text" id="search-input" class="search-input" placeholder="曲名や難易度（例: ★23）で検索...">
             </div>
-            <table>
+            <table id="chart-table">
                 <thead>
                     <tr>
                         <th class="center" style="width: 60px;">難易度</th>
@@ -561,9 +560,11 @@
             const searchInput = document.getElementById('search-input');
 
             function renderChartTable(data) {
+                const chartTable = document.getElementById('chart-table');
                 if (!data || data.length === 0) {
                     chartTableBody.innerHTML = "";
                     chartNoData.style.display = "block";
+                    if (chartTable) chartTable.style.display = "none";
                     return;
                 }
 
@@ -577,6 +578,7 @@
                 });
 
                 chartNoData.style.display = "none";
+                if (chartTable) chartTable.style.display = "table";
                 let html = "";
                 sortedData.forEach(row => {
                     const maxScore = parseInt(row.max_score) || 0;
