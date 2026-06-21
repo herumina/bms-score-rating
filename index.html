@@ -159,6 +159,25 @@
             color: #1976d2;
         }
 
+        .diff-val {
+            display: block;
+            font-size: 10px;
+            margin-top: 2px;
+            font-weight: bold;
+        }
+
+        .diff-minus {
+            color: #e53e3e;
+        }
+
+        .diff-plus {
+            color: #3182ce;
+        }
+
+        .diff-same {
+            color: #d69e2e;
+        }
+
         .loading {
             text-align: center;
             font-weight: bold;
@@ -376,10 +395,11 @@
                     <tr>
                         <th class="center" style="width: 70px;" onclick="changeSort('level')">難易度</th>
                         <th onclick="changeSort('title')">曲名</th>
-                        <th class="center" style="width: 70px;" onclick="changeSort('max_score')">notes</th>
+                        <th class="center" style="width: 70px;" onclick="changeSort('difficulty')">譜面定数</th>
+                        <th class="center" style="width: 90px;" onclick="changeSort('best')">自己ベスト</th>
                         <th class="center" style="width: 90px;" onclick="changeSort('aaa')">AAAボーダー</th>
                         <th class="center" style="width: 90px;" onclick="changeSort('max_min')">MAX-ボーダー</th>
-                        <th class="center" style="width: 70px;" onclick="changeSort('difficulty')">譜面定数</th>
+                        <th class="center" style="width: 70px;" onclick="changeSort('max_score')">MAX</th>
                     </tr>
                 </thead>
                 <tbody id="chart-table-body"></tbody>
@@ -392,6 +412,9 @@
         window.addEventListener('DOMContentLoaded', (event) => {
             let SQL = null;
             let csvData = [];
+            let userScores = {}; // スコアを共有変数化
+            let currentHashKey = "sha256"; // 現在使用しているハッシュの種類
+
             let isCsvReady = false;
             let isSqlReady = false;
 
@@ -533,7 +556,7 @@
                         }
 
                         const dbResult = db.exec(query);
-                        let userScores = {};
+                        userScores = {}; // リセット
                         let isMd5Mode = false;
 
                         if (dbResult.length > 0) {
@@ -548,18 +571,18 @@
                             });
                         }
 
-                        let calculatedList = [];
                         let csvKeys = csvData.length > 0 ? Object.keys(csvData[0]).map(k => k.toLowerCase()) : [];
-                        let csvHashKey = "sha256";
+                        currentHashKey = "sha256";
                         if (isMd5Mode) {
-                            if (csvKeys.includes("md5")) csvHashKey = "md5";
-                            else if (csvKeys.includes("hash")) csvHashKey = "hash";
+                            if (csvKeys.includes("md5")) currentHashKey = "md5";
+                            else if (csvKeys.includes("hash")) currentHashKey = "hash";
                         }
 
+                        let calculatedList = [];
                         let aaaCount = 0;
                         let maxMinusCount = 0;
                         csvData.forEach(item => {
-                            let rawKey = Object.keys(item).find(k => k.toLowerCase() === csvHashKey) || "sha256";
+                            let rawKey = Object.keys(item).find(k => k.toLowerCase() === currentHashKey) || "sha256";
                             let hash = item[rawKey] ? item[rawKey].toLowerCase().trim() : "";
 
                             if (userScores[hash] !== undefined) {
@@ -624,6 +647,9 @@
                         document.getElementById('result-box').style.display = "block";
                         document.getElementById('result-table').style.display = "table";
                         document.getElementById('loading-text').style.display = "none";
+
+                        // 譜面定数表も更新（スコアが反映されるように）
+                        applyFilters();
 
                     } catch (error) {
                         alert("解析中にエラーが発生しました:\n" + error.message);
@@ -722,9 +748,11 @@
                             valA = a.title || "";
                             valB = b.title || "";
                             break;
-                        case 'max_score':
-                            valA = parseInt(a.max_score) || 0;
-                            valB = parseInt(b.max_score) || 0;
+                        case 'best':
+                            const hashA = (a[Object.keys(a).find(k => k.toLowerCase() === currentHashKey)] || "").toLowerCase().trim();
+                            const hashB = (b[Object.keys(b).find(k => k.toLowerCase() === currentHashKey)] || "").toLowerCase().trim();
+                            valA = userScores[hashA] || 0;
+                            valB = userScores[hashB] || 0;
                             break;
                         case 'aaa':
                             valA = Math.ceil((parseInt(a.max_score) || 0) * 8 / 9);
@@ -733,6 +761,10 @@
                         case 'max_min':
                             valA = Math.ceil((parseInt(a.max_score) || 0) * 8.5 / 9);
                             valB = Math.ceil((parseInt(b.max_score) || 0) * 8.5 / 9);
+                            break;
+                        case 'max_score':
+                            valA = parseInt(a.max_score) || 0;
+                            valB = parseInt(b.max_score) || 0;
                             break;
                         case 'difficulty':
                         default:
@@ -755,7 +787,7 @@
                 // ヘッダーの選択状態を更新
                 document.querySelectorAll('#chart-table th').forEach(th => th.classList.remove('sort-active'));
                 const headers = document.querySelectorAll('#chart-table th');
-                const fieldToIndex = { 'level': 0, 'title': 1, 'max_score': 2, 'aaa': 3, 'max_min': 4, 'difficulty': 5 };
+                const fieldToIndex = { 'level': 0, 'title': 1, 'difficulty': 2, 'best': 3, 'aaa': 4, 'max_min': 5, 'max_score': 6 };
                 if (fieldToIndex[currentSortField] !== undefined) {
                     headers[fieldToIndex[currentSortField]].classList.add('sort-active');
                 }
@@ -773,14 +805,26 @@
                 let html = "";
                 data.forEach(row => {
                     const maxScore = parseInt(row.max_score) || 0;
-                    const notes = maxScore > 0 ? Math.floor(maxScore / 2) : "-";
-                    const aaaBorder = maxScore > 0 ? Math.ceil(maxScore * 8 / 9) : "-";
-                    const maxMinBorder = maxScore > 0 ? Math.ceil(maxScore * 8.5 / 9) : "-";
+                    const aaaBorder = maxScore > 0 ? Math.ceil(maxScore * 8 / 9) : 0;
+                    const maxMinBorder = maxScore > 0 ? Math.ceil(maxScore * 8.5 / 9) : 0;
                     const difficulty = Math.round(parseFloat(row.difficulty)) || 0;
                     const level = row.level || "-";
                     const title = row.title || "Unknown";
                     const md5 = row.md5 || "";
                     const irUrl = md5 ? `https://www.bms-ir.org/new/song?songmd5=${md5}` : "#";
+
+                    // 自己ベスト取得
+                    const rawKey = Object.keys(row).find(k => k.toLowerCase() === currentHashKey) || "sha256";
+                    const hash = row[rawKey] ? row[rawKey].toLowerCase().trim() : "";
+                    const best = userScores[hash] !== undefined ? userScores[hash] : null;
+
+                    const getDiffHtml = (score, border) => {
+                        if (score === null || !border) return "";
+                        const diff = score - border;
+                        const cls = diff < 0 ? "diff-minus" : (diff === 0 ? "diff-same" : "diff-plus");
+                        const sign = diff > 0 ? "+" : "";
+                        return `<span class="diff-val ${cls}">${sign}${diff}</span>`;
+                    };
 
                     html += `
                         <tr>
@@ -788,10 +832,20 @@
                             <td class="title">
                                 <a href="${irUrl}" target="_blank" class="chart-link">${title}</a>
                             </td>
-                            <td class="center">${notes}</td>
-                            <td class="center">${aaaBorder}</td>
-                            <td class="center">${maxMinBorder}</td>
                             <td class="center">${difficulty}</td>
+                            <td class="center">${best !== null ? best : "-"}</td>
+                            <td class="center">
+                                ${aaaBorder || "-"}
+                                ${getDiffHtml(best, aaaBorder)}
+                            </td>
+                            <td class="center">
+                                ${maxMinBorder || "-"}
+                                ${getDiffHtml(best, maxMinBorder)}
+                            </td>
+                            <td class="center">
+                                ${maxScore || "-"}
+                                ${getDiffHtml(best, maxScore)}
+                            </td>
                         </tr>
                     `;
                 });
