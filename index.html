@@ -771,16 +771,16 @@
                             valB = b.title || "";
                             break;
                         case 'best':
-                            const hashBestA = (a[Object.keys(a).find(k => k.toLowerCase() === currentHashKey)] || "").toLowerCase().trim();
-                            const hashBestB = (b[Object.keys(b).find(k => k.toLowerCase() === currentHashKey)] || "").toLowerCase().trim();
-                            valA = userScores[hashBestA] || 0;
-                            valB = userScores[hashBestB] || 0;
+                            const hBA = (a[Object.keys(a).find(k => k.toLowerCase() === currentHashKey)] || "").toLowerCase().trim();
+                            const hBB = (b[Object.keys(b).find(k => k.toLowerCase() === currentHashKey)] || "").toLowerCase().trim();
+                            valA = userScores[hBA] ? (userScores[hBA] / (parseInt(a.max_score) || 1)) * 100 : 0;
+                            valB = userScores[hBB] ? (userScores[hBB] / (parseInt(b.max_score) || 1)) * 100 : 0;
                             break;
                         case 'single_rating':
                             const hA = (a[Object.keys(a).find(k => k.toLowerCase() === currentHashKey)] || "").toLowerCase().trim();
                             const hB = (b[Object.keys(b).find(k => k.toLowerCase() === currentHashKey)] || "").toLowerCase().trim();
-                            valA = userScores[hA] ? calcSingleRating(userScores[hA], parseFloat(a.difficulty) || 0, parseInt(a.max_score) || 0) : 0;
-                            valB = userScores[hB] ? calcSingleRating(userScores[hB], parseFloat(b.difficulty) || 0, parseInt(b.max_score) || 0) : 0;
+                            valA = userScores[hA] ? calcSingleRating(userScores[hA], parseInt(a.max_score) || 0, parseFloat(a.difficulty) || 0) : 0;
+                            valB = userScores[hB] ? calcSingleRating(userScores[hB], parseInt(b.max_score) || 0, parseFloat(b.difficulty) || 0) : 0;
                             break;
                         case 'aaa':
                             valA = Math.ceil((parseInt(a.max_score) || 0) * 8 / 9);
@@ -854,7 +854,7 @@
                         else rateClass = "rate-orange";
                     }
 
-                    const singleRating = best !== null ? calcSingleRating(best, parseFloat(row.difficulty) || 0, maxScore) : 0;
+                    const singleRating = best !== null ? calcSingleRating(best, maxScore, parseFloat(row.difficulty) || 0) : 0;
                     const isBest50 = best50Hashes.has(hash);
 
                     const getDiffHtml = (score, border) => {
