@@ -148,6 +148,17 @@
             color: #2196F3;
         }
 
+        .chart-link {
+            color: #2196F3;
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        .chart-link:hover {
+            text-decoration: underline;
+            color: #1976d2;
+        }
+
         .loading {
             text-align: center;
             font-weight: bold;
@@ -218,6 +229,25 @@
             padding: 30px;
             color: #7f8c8d;
             font-style: italic;
+        }
+
+        /* Chart Table Specific */
+        #chart-table th {
+            font-size: 11px;
+            padding: 10px 4px;
+            cursor: pointer;
+            white-space: nowrap;
+            user-select: none;
+        }
+
+        #chart-table th:hover {
+            background-color: #edf2f7;
+            color: #2196F3;
+        }
+
+        #chart-table th.sort-active {
+            color: #2196F3;
+            border-bottom: 2px solid #2196F3;
         }
 
         /* --- Level Filters --- */
@@ -344,12 +374,12 @@
             <table id="chart-table">
                 <thead>
                     <tr>
-                        <th class="center" style="width: 70px;">難易度</th>
-                        <th>曲名</th>
-                        <th class="center" style="width: 80px;">notes</th>
-                        <th class="center" style="width: 100px;">AAAボーダー</th>
-                        <th class="center" style="width: 100px;">MAX-ボーダー</th>
-                        <th class="center" style="width: 80px;">譜面定数</th>
+                        <th class="center" style="width: 70px;" onclick="changeSort('level')">難易度</th>
+                        <th onclick="changeSort('title')">曲名</th>
+                        <th class="center" style="width: 70px;" onclick="changeSort('max_score')">notes</th>
+                        <th class="center" style="width: 90px;" onclick="changeSort('aaa')">AAAボーダー</th>
+                        <th class="center" style="width: 90px;" onclick="changeSort('max_min')">MAX-ボーダー</th>
+                        <th class="center" style="width: 70px;" onclick="changeSort('difficulty')">譜面定数</th>
                     </tr>
                 </thead>
                 <tbody id="chart-table-body"></tbody>
@@ -623,15 +653,14 @@
             const filterContainer = document.getElementById('level-filter-container');
             let selectedLevels = new Set();
 
+            let currentSortField = 'difficulty';
+            let currentSortDir = 'desc';
+
             function initFilters() {
                 // ユニークなレベルを抽出
                 const levels = [...new Set(csvData.map(row => row.level))].filter(l => l);
                 // ソート（★1, ★2...の順になるように試行）
-                levels.sort((a, b) => {
-                    const numA = parseInt(a.replace(/[^0-9]/g, '')) || 0;
-                    const numB = parseInt(b.replace(/[^0-9]/g, '')) || 0;
-                    return numA - numB;
-                });
+                levels.sort(compareLevelStrings);
 
                 let html = "";
                 levels.forEach(level => {
@@ -644,6 +673,23 @@
                 });
                 filterContainer.innerHTML = html;
             }
+
+            function compareLevelStrings(a, b) {
+                const numA = parseInt(a.replace(/[^0-9]/g, '')) || 0;
+                const numB = parseInt(b.replace(/[^0-9]/g, '')) || 0;
+                if (numA !== numB) return numA - numB;
+                return a.localeCompare(b);
+            }
+
+            window.changeSort = function (field) {
+                if (currentSortField === field) {
+                    currentSortDir = currentSortDir === 'desc' ? 'asc' : 'desc';
+                } else {
+                    currentSortField = field;
+                    currentSortDir = 'desc';
+                }
+                applyFilters();
+            };
 
             window.toggleLevel = function (level, checkbox) {
                 if (checkbox.checked) {
@@ -665,11 +711,55 @@
                     const matchesLevel = selectedLevels.size === 0 || selectedLevels.has(row.level);
                     return matchesText && matchesLevel;
                 });
+
+                // ソート適用
+                filtered.sort((a, b) => {
+                    let valA, valB;
+                    switch (currentSortField) {
+                        case 'level':
+                            return currentSortDir === 'desc' ? compareLevelStrings(b.level, a.level) : compareLevelStrings(a.level, b.level);
+                        case 'title':
+                            valA = a.title || "";
+                            valB = b.title || "";
+                            break;
+                        case 'max_score':
+                            valA = parseInt(a.max_score) || 0;
+                            valB = parseInt(b.max_score) || 0;
+                            break;
+                        case 'aaa':
+                            valA = Math.ceil((parseInt(a.max_score) || 0) * 8 / 9);
+                            valB = Math.ceil((parseInt(b.max_score) || 0) * 8 / 9);
+                            break;
+                        case 'max_min':
+                            valA = Math.ceil((parseInt(a.max_score) || 0) * 8.5 / 9);
+                            valB = Math.ceil((parseInt(b.max_score) || 0) * 8.5 / 9);
+                            break;
+                        case 'difficulty':
+                        default:
+                            valA = parseFloat(a.difficulty) || 0;
+                            valB = parseFloat(b.difficulty) || 0;
+                            break;
+                    }
+
+                    if (valA < valB) return currentSortDir === 'desc' ? 1 : -1;
+                    if (valA > valB) return currentSortDir === 'desc' ? -1 : 1;
+                    return 0;
+                });
+
                 renderChartTable(filtered);
             };
 
             function renderChartTable(data) {
                 const chartTable = document.getElementById('chart-table');
+
+                // ヘッダーの選択状態を更新
+                document.querySelectorAll('#chart-table th').forEach(th => th.classList.remove('sort-active'));
+                const headers = document.querySelectorAll('#chart-table th');
+                const fieldToIndex = { 'level': 0, 'title': 1, 'max_score': 2, 'aaa': 3, 'max_min': 4, 'difficulty': 5 };
+                if (fieldToIndex[currentSortField] !== undefined) {
+                    headers[fieldToIndex[currentSortField]].classList.add('sort-active');
+                }
+
                 if (!data || data.length === 0) {
                     chartTableBody.innerHTML = "";
                     chartNoData.style.display = "block";
@@ -677,31 +767,27 @@
                     return;
                 }
 
-                // 難易度定数（difficulty）が高い順にソート
-                const sortedData = [...data].sort((a, b) => {
-                    const diffA = parseFloat(a.difficulty) || 0;
-                    const diffB = parseFloat(b.difficulty) || 0;
-                    if (diffA !== diffB) return diffB - diffA;
-                    return (a.title || "").localeCompare(b.title || "");
-                });
-
                 chartNoData.style.display = "none";
                 if (chartTable) chartTable.style.display = "table";
 
                 let html = "";
-                sortedData.forEach(row => {
+                data.forEach(row => {
                     const maxScore = parseInt(row.max_score) || 0;
                     const notes = maxScore > 0 ? Math.floor(maxScore / 2) : "-";
                     const aaaBorder = maxScore > 0 ? Math.ceil(maxScore * 8 / 9) : "-";
                     const maxMinBorder = maxScore > 0 ? Math.ceil(maxScore * 8.5 / 9) : "-";
-                    const difficulty = Math.round(parseFloat(row.difficulty)) || 0; // 整数表示
+                    const difficulty = Math.round(parseFloat(row.difficulty)) || 0;
                     const level = row.level || "-";
                     const title = row.title || "Unknown";
+                    const md5 = row.md5 || "";
+                    const irUrl = md5 ? `https://www.bms-ir.org/new/song?songmd5=${md5}` : "#";
 
                     html += `
                         <tr>
                             <td class="center level-tag">${level}</td>
-                            <td class="title">${title}</td>
+                            <td class="title">
+                                <a href="${irUrl}" target="_blank" class="chart-link">${title}</a>
+                            </td>
                             <td class="center">${notes}</td>
                             <td class="center">${aaaBorder}</td>
                             <td class="center">${maxMinBorder}</td>
