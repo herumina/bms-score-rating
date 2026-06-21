@@ -219,6 +219,57 @@
             color: #7f8c8d;
             font-style: italic;
         }
+
+        /* --- Level Filters --- */
+        .filter-section {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .filter-label {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 10px;
+            color: #4a5568;
+            font-size: 14px;
+        }
+
+        .level-filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .level-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 13px;
+            cursor: pointer;
+            padding: 4px 8px;
+            background: #fff;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            user-select: none;
+            transition: all 0.2s ease;
+        }
+
+        .level-checkbox:hover {
+            border-color: #2196F3;
+        }
+
+        .level-checkbox input {
+            cursor: pointer;
+        }
+
+        .level-checkbox.selected {
+            background: #e3f2fd;
+            border-color: #2196F3;
+            color: #1976d2;
+        }
     </style>
 </head>
 
@@ -280,15 +331,25 @@
         <!-- 譜面定数表タブ -->
         <div id="chart-tab" class="tab-content">
             <div class="search-container">
-                <input type="text" id="search-input" class="search-input" placeholder="曲名や難易度（例: ★23）で検索...">
+                <input type="text" id="search-input" class="search-input" placeholder="曲名やレベルで検索...">
             </div>
+
+            <div class="filter-section">
+                <span class="filter-label">レベルフィルタ:</span>
+                <div id="level-filter-container" class="level-filters">
+                    <span style="color: #999; font-size: 12px;">読み込み中...</span>
+                </div>
+            </div>
+
             <table id="chart-table">
                 <thead>
                     <tr>
-                        <th class="center" style="width: 60px;">難易度</th>
+                        <th class="center" style="width: 70px;">難易度</th>
                         <th>曲名</th>
-                        <th class="center" style="width: 100px;">MAXノーツ</th>
-                        <th class="center" style="width: 100px;">難易度定数</th>
+                        <th class="center" style="width: 80px;">notes</th>
+                        <th class="center" style="width: 100px;">AAAボーダー</th>
+                        <th class="center" style="width: 100px;">MAX-ボーダー</th>
+                        <th class="center" style="width: 80px;">譜面定数</th>
                     </tr>
                 </thead>
                 <tbody id="chart-table-body"></tbody>
@@ -326,7 +387,6 @@
                 header: true,
                 skipEmptyLines: true,
                 complete: function (results) {
-                    console.log("CSV load complete. Row count:", results.data.length);
                     // カラム名の空白やBOMを考慮してデータを正規化
                     csvData = results.data.map(row => {
                         const newRow = {};
@@ -336,23 +396,15 @@
                         return newRow;
                     }).filter(row => row.title || row.title_en);
 
-                    console.log("Filtered CSV count:", csvData.length);
-
                     if (csvData.length === 0) {
                         console.error("CSV data is empty or could not be parsed.");
                         statusEl.innerText = "【警告】CSVデータが空、または解析できませんでした。";
-                    } else {
-                        // デバッグ用に読み込み件数を追加表示
-                        const debugInfo = document.createElement('div');
-                        debugInfo.style.fontSize = "12px";
-                        debugInfo.style.color = "#999";
-                        debugInfo.innerText = `（譜面データ: ${csvData.length}件 読み込み完了）`;
-                        statusEl.appendChild(debugInfo);
                     }
 
                     isCsvReady = true;
                     checkReadyStatus();
-                    renderChartTable(csvData); // 初期表示
+                    initFilters(); // フィルタの初期化
+                    applyFilters(); // 初期表示
                 },
                 error: function (err) {
                     console.error("PapaParse Error:", err);
@@ -568,6 +620,53 @@
             const chartTableBody = document.getElementById('chart-table-body');
             const chartNoData = document.getElementById('chart-no-data');
             const searchInput = document.getElementById('search-input');
+            const filterContainer = document.getElementById('level-filter-container');
+            let selectedLevels = new Set();
+
+            function initFilters() {
+                // ユニークなレベルを抽出
+                const levels = [...new Set(csvData.map(row => row.level))].filter(l => l);
+                // ソート（★1, ★2...の順になるように試行）
+                levels.sort((a, b) => {
+                    const numA = parseInt(a.replace(/[^0-9]/g, '')) || 0;
+                    const numB = parseInt(b.replace(/[^0-9]/g, '')) || 0;
+                    return numA - numB;
+                });
+
+                let html = "";
+                levels.forEach(level => {
+                    html += `
+                        <label class="level-checkbox">
+                            <input type="checkbox" value="${level}" onchange="toggleLevel('${level}', this)">
+                            ${level}
+                        </label>
+                    `;
+                });
+                filterContainer.innerHTML = html;
+            }
+
+            window.toggleLevel = function (level, checkbox) {
+                if (checkbox.checked) {
+                    selectedLevels.add(level);
+                    checkbox.parentElement.classList.add('selected');
+                } else {
+                    selectedLevels.delete(level);
+                    checkbox.parentElement.classList.remove('selected');
+                }
+                applyFilters();
+            };
+
+            window.applyFilters = function () {
+                const term = searchInput.value.toLowerCase();
+                const filtered = csvData.filter(row => {
+                    const title = (row.title || "").toLowerCase();
+                    const level = (row.level || "").toLowerCase();
+                    const matchesText = title.includes(term) || level.includes(term);
+                    const matchesLevel = selectedLevels.size === 0 || selectedLevels.has(row.level);
+                    return matchesText && matchesLevel;
+                });
+                renderChartTable(filtered);
+            };
 
             function renderChartTable(data) {
                 const chartTable = document.getElementById('chart-table');
@@ -583,17 +682,19 @@
                     const diffA = parseFloat(a.difficulty) || 0;
                     const diffB = parseFloat(b.difficulty) || 0;
                     if (diffA !== diffB) return diffB - diffA;
-                    // 定数が同じならレベル順、曲名順
                     return (a.title || "").localeCompare(b.title || "");
                 });
 
                 chartNoData.style.display = "none";
                 if (chartTable) chartTable.style.display = "table";
+
                 let html = "";
                 sortedData.forEach(row => {
                     const maxScore = parseInt(row.max_score) || 0;
-                    const maxNotes = maxScore > 0 ? Math.floor(maxScore / 2) : "-";
-                    const difficulty = parseFloat(row.difficulty) || 0;
+                    const notes = maxScore > 0 ? Math.floor(maxScore / 2) : "-";
+                    const aaaBorder = maxScore > 0 ? Math.ceil(maxScore * 8 / 9) : "-";
+                    const maxMinBorder = maxScore > 0 ? Math.ceil(maxScore * 8.5 / 9) : "-";
+                    const difficulty = Math.round(parseFloat(row.difficulty)) || 0; // 整数表示
                     const level = row.level || "-";
                     const title = row.title || "Unknown";
 
@@ -601,23 +702,17 @@
                         <tr>
                             <td class="center level-tag">${level}</td>
                             <td class="title">${title}</td>
-                            <td class="center">${maxNotes}</td>
-                            <td class="center">${difficulty ? difficulty.toFixed(2) : "-"}</td>
+                            <td class="center">${notes}</td>
+                            <td class="center">${aaaBorder}</td>
+                            <td class="center">${maxMinBorder}</td>
+                            <td class="center">${difficulty}</td>
                         </tr>
                     `;
                 });
                 chartTableBody.innerHTML = html;
             }
 
-            searchInput.addEventListener('input', (e) => {
-                const term = e.target.value.toLowerCase();
-                const filtered = csvData.filter(row => {
-                    const title = (row.title || "").toLowerCase();
-                    const level = (row.level || "").toLowerCase();
-                    return title.includes(term) || level.includes(term);
-                });
-                renderChartTable(filtered);
-            });
+            searchInput.addEventListener('input', applyFilters);
         });
     </script>
 </body>
