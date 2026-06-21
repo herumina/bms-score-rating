@@ -156,6 +156,70 @@
             margin: 20px 0;
             display: none;
         }
+
+        /* --- Tabs --- */
+        .tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            border: none;
+            background: none;
+            color: #6c757d;
+            cursor: pointer;
+            font-weight: bold;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .tab-btn:hover {
+            color: #2196F3;
+        }
+
+        .tab-btn.active {
+            color: #2196F3;
+            border-bottom-color: #2196F3;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* --- Chart Table --- */
+        .search-container {
+            margin-bottom: 20px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.3s ease;
+            box-sizing: border-box;
+        }
+
+        .search-input:focus {
+            border-color: #2196F3;
+            box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 30px;
+            color: #7f8c8d;
+            font-style: italic;
+        }
     </style>
 </head>
 
@@ -165,46 +229,73 @@
         <h1>発狂難易度レーティング計算機β</h1>
         <div class="subtitle">発狂難易度表のAAA、MAX-埋めのモチベーションを上げたい人のための</div>
 
-        <div class="upload-section">
-            <p>LR2の場合は、名前.db orajaの場合はscorelog.dbを選んでください</p>
-            <label class="upload-btn">
-                ファイルを選択
-                <input type="file" id="dbfile" accept=".db">
-            </label>
-            <div id="file-status">【状況】プログラムを起動しています...</div>
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('rating')">レーティング計算</button>
+            <button class="tab-btn" onclick="switchTab('chart')">譜面定数表</button>
         </div>
 
-        <div class="loading" id="loading-text">データを解析中...しばらくお待ちください</div>
+        <!-- レーティング計算タブ -->
+        <div id="rating-tab" class="tab-content active">
+            <div class="upload-section">
+                <p>LR2の場合は、名前.db orajaの場合はscorelog.dbを選んでください</p>
+                <label class="upload-btn">
+                    ファイルを選択
+                    <input type="file" id="dbfile" accept=".db">
+                </label>
+                <div id="file-status">【状況】プログラムを起動しています...</div>
+            </div>
 
-        <div class="score-box" id="result-box">
-            <h2>総合レーティング (Best枠50譜面のレート値合計 + AAA数×0.1 + MAX-数×0.1)</h2>
-            <div class="rating-value" id="total-rating">---</div>
-            <div
-                style="display: flex; justify-content: center; gap: 40px; margin-top: 20px; border-top: 1px solid #d4eed8; padding-top: 15px;">
-                <div>
-                    <div style="font-size: 13px; color: #7f8c8d; margin-bottom: 5px;">AAA 譜面数</div>
-                    <div style="font-size: 24px; font-weight: bold; color: #2c3e50;" id="aaa-count">0</div>
-                </div>
-                <div>
-                    <div style="font-size: 13px; color: #7f8c8d; margin-bottom: 5px;">MAX- 譜面数</div>
-                    <div style="font-size: 24px; font-weight: bold; color: #2c3e50;" id="max-minus-count">0</div>
+            <div class="loading" id="loading-text">データを解析中...しばらくお待ちください</div>
+
+            <div class="score-box" id="result-box">
+                <h2>総合レーティング (Best 50合計 + MAX-ボーナス)</h2>
+                <div class="rating-value" id="total-rating">---</div>
+                <div
+                    style="display: flex; justify-content: center; gap: 40px; margin-top: 20px; border-top: 1px solid #d4eed8; padding-top: 15px;">
+                    <div>
+                        <div style="font-size: 13px; color: #7f8c8d; margin-bottom: 5px;">AAA 譜面数</div>
+                        <div style="font-size: 24px; font-weight: bold; color: #2c3e50;" id="aaa-count">0</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 13px; color: #7f8c8d; margin-bottom: 5px;">MAX- 譜面数</div>
+                        <div style="font-size: 24px; font-weight: bold; color: #2c3e50;" id="max-minus-count">0</div>
+                    </div>
                 </div>
             </div>
+
+            <table id="result-table">
+                <thead>
+                    <tr>
+                        <th class="center">順位</th>
+                        <th class="center">難易度</th>
+                        <th>曲名</th>
+                        <th class="center">スコアレート</th>
+                        <th class="center">譜面定数</th>
+                        <th class="center">単曲レート</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body"></tbody>
+            </table>
         </div>
 
-        <table id="result-table">
-            <thead>
-                <tr>
-                    <th class="center">順位</th>
-                    <th class="center">難易度</th>
-                    <th>曲名</th>
-                    <th class="center">スコアレート</th>
-                    <th class="center">譜面定数</th>
-                    <th class="center">単曲レート</th>
-                </tr>
-            </thead>
-            <tbody id="table-body"></tbody>
-        </table>
+        <!-- 譜面定数表タブ -->
+        <div id="chart-tab" class="tab-content">
+            <div class="search-container">
+                <input type="text" id="search-input" class="search-input" placeholder="曲名や難易度（例: ★23）で検索...">
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th class="center" style="width: 60px;">難易度</th>
+                        <th>曲名</th>
+                        <th class="center" style="width: 100px;">MAXノーツ</th>
+                        <th class="center" style="width: 100px;">難易度定数</th>
+                    </tr>
+                </thead>
+                <tbody id="chart-table-body"></tbody>
+            </table>
+            <div id="chart-no-data" class="no-data" style="display: none;">該当する譜面が見つかりません。</div>
+        </div>
     </div>
 
     <script>
@@ -235,9 +326,10 @@
                 download: true,
                 header: true,
                 complete: function (results) {
-                    csvData = results.data;
+                    csvData = results.data.filter(row => row.title); // 空行除外
                     isCsvReady = true;
                     checkReadyStatus();
+                    renderChartTable(csvData); // 初期表示
                 },
                 error: function (err) {
                     statusEl.innerText = "【エラー】hakkyoudata.csv の読み込みに失敗しました。";
@@ -433,6 +525,67 @@
                     }
                 };
                 reader.readAsArrayBuffer(file);
+            });
+
+            // --- 譜面定数表用ロジック ---
+            window.switchTab = function (tabName) {
+                // ボタンの表示更新
+                document.querySelectorAll('.tab-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                    if (btn.getAttribute('onclick').includes(tabName)) btn.classList.add('active');
+                });
+                // コンテンツの表示切替
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+                document.getElementById(tabName + '-tab').classList.add('active');
+            };
+
+            const chartTableBody = document.getElementById('chart-table-body');
+            const chartNoData = document.getElementById('chart-no-data');
+            const searchInput = document.getElementById('search-input');
+
+            function renderChartTable(data) {
+                // 難易度定数（difficulty）が高い順にソート
+                const sortedData = [...data].sort((a, b) => {
+                    const diffA = parseFloat(a.difficulty) || 0;
+                    const diffB = parseFloat(b.difficulty) || 0;
+                    return diffB - diffA;
+                });
+
+                if (sortedData.length === 0) {
+                    chartTableBody.innerHTML = "";
+                    chartNoData.style.display = "block";
+                    return;
+                }
+
+                chartNoData.style.display = "none";
+                let html = "";
+                sortedData.forEach(row => {
+                    const maxScore = parseInt(row.max_score) || 0;
+                    const maxNotes = maxScore > 0 ? Math.floor(maxScore / 2) : "-";
+                    const difficulty = parseFloat(row.difficulty) || 0;
+
+                    html += `
+                        <tr>
+                            <td class="center level-tag">${row.level || "-"}</td>
+                            <td class="title">${row.title || "Unknown"}</td>
+                            <td class="center">${maxNotes}</td>
+                            <td class="center">${difficulty.toFixed(2)}</td>
+                        </tr>
+                    `;
+                });
+                chartTableBody.innerHTML = html;
+            }
+
+            searchInput.addEventListener('input', (e) => {
+                const term = e.target.value.toLowerCase();
+                const filtered = csvData.filter(row => {
+                    const title = (row.title || "").toLowerCase();
+                    const level = (row.level || "").toLowerCase();
+                    return title.includes(term) || level.includes(term);
+                });
+                renderChartTable(filtered);
             });
         });
     </script>
