@@ -325,14 +325,29 @@
             Papa.parse("hakkyoudata.csv", {
                 download: true,
                 header: true,
+                skipEmptyLines: true,
                 complete: function (results) {
-                    csvData = results.data.filter(row => row.title); // 空行除外
+                    // カラム名の空白やBOMを考慮してデータを正規化
+                    csvData = results.data.map(row => {
+                        const newRow = {};
+                        Object.keys(row).forEach(key => {
+                            newRow[key.trim()] = row[key];
+                        });
+                        return newRow;
+                    }).filter(row => row.title || row.title_en); // titleがあれば有効
+
+                    if (csvData.length === 0) {
+                        console.error("CSV data is empty or could not be parsed.");
+                        statusEl.innerText = "【警告】CSVデータが空、または解析できませんでした。";
+                    }
+
                     isCsvReady = true;
                     checkReadyStatus();
                     renderChartTable(csvData); // 初期表示
                 },
                 error: function (err) {
-                    statusEl.innerText = "【エラー】hakkyoudata.csv の読み込みに失敗しました。";
+                    console.error("PapaParse Error:", err);
+                    statusEl.innerText = "【エラー】hakkyoudata.csv の読み込みに失敗しました。パスを確認してください。";
                 }
             });
 
@@ -546,18 +561,20 @@
             const searchInput = document.getElementById('search-input');
 
             function renderChartTable(data) {
-                // 難易度定数（difficulty）が高い順にソート
-                const sortedData = [...data].sort((a, b) => {
-                    const diffA = parseFloat(a.difficulty) || 0;
-                    const diffB = parseFloat(b.difficulty) || 0;
-                    return diffB - diffA;
-                });
-
-                if (sortedData.length === 0) {
+                if (!data || data.length === 0) {
                     chartTableBody.innerHTML = "";
                     chartNoData.style.display = "block";
                     return;
                 }
+
+                // 難易度定数（difficulty）が高い順にソート
+                const sortedData = [...data].sort((a, b) => {
+                    const diffA = parseFloat(a.difficulty) || 0;
+                    const diffB = parseFloat(b.difficulty) || 0;
+                    if (diffA !== diffB) return diffB - diffA;
+                    // 定数が同じならレベル順、曲名順
+                    return (a.title || "").localeCompare(b.title || "");
+                });
 
                 chartNoData.style.display = "none";
                 let html = "";
@@ -565,13 +582,15 @@
                     const maxScore = parseInt(row.max_score) || 0;
                     const maxNotes = maxScore > 0 ? Math.floor(maxScore / 2) : "-";
                     const difficulty = parseFloat(row.difficulty) || 0;
+                    const level = row.level || "-";
+                    const title = row.title || "Unknown";
 
                     html += `
                         <tr>
-                            <td class="center level-tag">${row.level || "-"}</td>
-                            <td class="title">${row.title || "Unknown"}</td>
+                            <td class="center level-tag">${level}</td>
+                            <td class="title">${title}</td>
                             <td class="center">${maxNotes}</td>
-                            <td class="center">${difficulty.toFixed(2)}</td>
+                            <td class="center">${difficulty ? difficulty.toFixed(2) : "-"}</td>
                         </tr>
                     `;
                 });
