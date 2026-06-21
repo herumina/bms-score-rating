@@ -1,266 +1,413 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>発狂難易度レーティング計算機β</title>
     <script src="sql-wasm.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" crossorigin="anonymous"
+        referrerpolicy="no-referrer"></script>
     <style>
-        body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f4f6f9; color: #333; margin: 0; padding: 20px; }
-        .container { max-width: 950px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        h1 { text-align: center; color: #2c3e50; margin-bottom: 5px; }
-        .subtitle { text-align: center; color: #7f8c8d; margin-bottom: 30px; }
-        .upload-section { background: #f8f9fa; border: 2px dashed #cbd5e1; padding: 20px; border-radius: 6px; text-align: center; margin-bottom: 25px; }
-        .upload-section input { display: none; }
-        .upload-btn { background: #2196F3; color: white; padding: 10px 20px; border-radius: 4px; font-weight: bold; cursor: pointer; display: inline-block; margin-top: 10px; }
-        .upload-btn:hover { background: #1e88e5; }
-        #file-status { margin-top: 10px; font-size: 14px; color: #e67e22; font-weight: bold; }
-        .score-box { text-align: center; background: #eef9f0; border: 2px solid #d4eed8; padding: 20px; border-radius: 6px; margin-bottom: 30px; display: none; }
-        .score-box h2 { margin: 0; font-size: 16px; color: #27ae60; }
-        .score-box .rating-value { font-size: 48px; font-weight: bold; color: #2196F3; margin: 10px 0 0 0; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; display: none; }
-        th { background-color: #f8f9fa; color: #6c757d; font-weight: 600; padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6; }
-        td { padding: 12px; border-bottom: 1px solid #dee2e6; font-size: 14px; }
-        tr:hover { background-color: #f8f9fa; }
-        .center { text-align: center; }
-        .rank { font-weight: bold; color: #7f8c8d; text-align: center; width: 40px; }
-        .level-tag { font-weight: bold; color: #2196F3; width: 60px; }
-        .title { font-weight: 500; color: #2c3e50; }
-        .single-rate { font-weight: bold; color: #2196F3; }
-        .loading { text-align: center; font-weight: bold; color: #ff9800; margin: 20px 0; display: none; }
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f4f6f9;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 950px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #7f8c8d;
+            margin-bottom: 30px;
+        }
+
+        .upload-section {
+            background: #f8f9fa;
+            border: 2px dashed #cbd5e1;
+            padding: 20px;
+            border-radius: 6px;
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        .upload-section input {
+            display: none;
+        }
+
+        .upload-btn {
+            background: #2196F3;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            display: inline-block;
+            margin-top: 10px;
+        }
+
+        .upload-btn:hover {
+            background: #1e88e5;
+        }
+
+        #file-status {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #e67e22;
+            font-weight: bold;
+        }
+
+        .score-box {
+            text-align: center;
+            background: #eef9f0;
+            border: 2px solid #d4eed8;
+            padding: 20px;
+            border-radius: 6px;
+            margin-bottom: 30px;
+            display: none;
+        }
+
+        .score-box h2 {
+            margin: 0;
+            font-size: 16px;
+            color: #27ae60;
+        }
+
+        .score-box .rating-value {
+            font-size: 48px;
+            font-weight: bold;
+            color: #2196F3;
+            margin: 10px 0 0 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            display: none;
+        }
+
+        th {
+            background-color: #f8f9fa;
+            color: #6c757d;
+            font-weight: 600;
+            padding: 12px;
+            text-align: left;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #dee2e6;
+            font-size: 14px;
+        }
+
+        tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        .center {
+            text-align: center;
+        }
+
+        .rank {
+            font-weight: bold;
+            color: #7f8c8d;
+            text-align: center;
+            width: 40px;
+        }
+
+        .level-tag {
+            font-weight: bold;
+            color: #2196F3;
+            width: 60px;
+        }
+
+        .title {
+            font-weight: 500;
+            color: #2c3e50;
+        }
+
+        .single-rate {
+            font-weight: bold;
+            color: #2196F3;
+        }
+
+        .loading {
+            text-align: center;
+            font-weight: bold;
+            color: #ff9800;
+            margin: 20px 0;
+            display: none;
+        }
     </style>
 </head>
+
 <body>
 
-<div class="container">
-    <h1>発狂難易度レーティング計算機β</h1>
-    <div class="subtitle">発狂難易度表のAAA、MAX-埋めのモチベーションを上げたい人のための</div>
-    
-    <div class="upload-section">
-        <p>LR2の場合は、名前.db  orajaの場合はscorelog.dbを選んでください</p>
-        <label class="upload-btn">
-            ファイルを選択
-            <input type="file" id="dbfile" accept=".db">
-        </label>
-        <div id="file-status">【状況】プログラムを起動しています...</div>
+    <div class="container">
+        <h1>発狂難易度レーティング計算機β</h1>
+        <div class="subtitle">発狂難易度表のAAA、MAX-埋めのモチベーションを上げたい人のための</div>
+
+        <div class="upload-section">
+            <p>LR2の場合は、名前.db orajaの場合はscorelog.dbを選んでください</p>
+            <label class="upload-btn">
+                ファイルを選択
+                <input type="file" id="dbfile" accept=".db">
+            </label>
+            <div id="file-status">【状況】プログラムを起動しています...</div>
+        </div>
+
+        <div class="loading" id="loading-text">データを解析中...しばらくお待ちください</div>
+
+        <div class="score-box" id="result-box">
+            <h2>総合レーティング (Best 50合計 + MAX-ボーナス)</h2>
+            <div class="rating-value" id="total-rating">---</div>
+            <div
+                style="display: flex; justify-content: center; gap: 40px; margin-top: 20px; border-top: 1px solid #d4eed8; padding-top: 15px;">
+                <div>
+                    <div style="font-size: 13px; color: #7f8c8d; margin-bottom: 5px;">AAA 譜面数</div>
+                    <div style="font-size: 24px; font-weight: bold; color: #2c3e50;" id="aaa-count">0</div>
+                </div>
+                <div>
+                    <div style="font-size: 13px; color: #7f8c8d; margin-bottom: 5px;">MAX- 譜面数</div>
+                    <div style="font-size: 24px; font-weight: bold; color: #2c3e50;" id="max-minus-count">0</div>
+                </div>
+            </div>
+        </div>
+
+        <table id="result-table">
+            <thead>
+                <tr>
+                    <th class="center">順位</th>
+                    <th class="center">難易度</th>
+                    <th>曲名</th>
+                    <th class="center">スコアレート</th>
+                    <th class="center">譜面定数</th>
+                    <th class="center">単曲レート</th>
+                </tr>
+            </thead>
+            <tbody id="table-body"></tbody>
+        </table>
     </div>
 
-    <div class="loading" id="loading-text">データを解析中...しばらくお待ちください</div>
+    <script>
+        window.addEventListener('DOMContentLoaded', (event) => {
+            let SQL = null;
+            let csvData = [];
+            let isCsvReady = false;
+            let isSqlReady = false;
 
-    <div class="score-box" id="result-box">
-        <h2>総合レーティング (Best 50合計)</h2>
-        <div class="rating-value" id="total-rating">---</div>
-    </div>
-    
-    <table id="result-table">
-        <thead>
-            <tr>
-                <th class="center">順位</th>
-                <th class="center">難易度</th>
-                <th>曲名</th>
-                <th class="center">スコアレート</th>
-                <th class="center">譜面定数</th>
-                <th class="center">単曲レート</th>
-            </tr>
-        </thead>
-        <tbody id="table-body"></tbody>
-    </table>
-</div>
+            const statusEl = document.getElementById('file-status');
+            const AAA_BORDER = (8 / 9) * 100;
+            const MAX_MIN_BORDER = (8.5 / 9) * 100;
 
-<script>
-    window.addEventListener('DOMContentLoaded', (event) => {
-        let SQL = null;
-        let csvData = [];
-        let isCsvReady = false;
-        let isSqlReady = false;
-
-        const statusEl = document.getElementById('file-status');
-
-        function checkReadyStatus() {
-            if (isSqlReady && isCsvReady) {
-                statusEl.style.color = "#27ae60";
-                statusEl.innerText = "【準備完了！】.dbファイルを選択してください。";
-            } else {
-                let statusText = "【初期化中】 ";
-                if (!isSqlReady) statusText += "[SQLエンジン読み込み中...] ";
-                if (!isCsvReady) statusText += "[定数CSVデータ読み込み中...] ";
-                statusEl.innerText = statusText;
+            function checkReadyStatus() {
+                if (isSqlReady && isCsvReady) {
+                    statusEl.style.color = "#27ae60";
+                    statusEl.innerText = "【準備完了！】.dbファイルを選択してください。";
+                } else {
+                    let statusText = "【初期化中】 ";
+                    if (!isSqlReady) statusText += "[SQLエンジン読み込み中...] ";
+                    if (!isCsvReady) statusText += "[定数CSVデータ読み込み中...] ";
+                    statusEl.innerText = statusText;
+                }
             }
-        }
 
-        // 1. 譜面定数CSVの読み込み
-        Papa.parse("hakkyoudata.csv", {
-            download: true,
-            header: true,
-            complete: function(results) {
-                csvData = results.data;
-                isCsvReady = true;
-                checkReadyStatus();
-            },
-            error: function(err) {
-                statusEl.innerText = "【エラー】hakkyoudata.csv の読み込みに失敗しました。";
-            }
-        });
-
-        // 2. 自分のリポジトリ内にあるファイルから sql.js を初期化
-        if (typeof initSqlJs !== 'undefined') {
-            initSqlJs({ locateFile: file => file }).then(function(js){
-                SQL = js;
-                isSqlReady = true;
-                checkReadyStatus();
-            }).catch(function(err) {
-                statusEl.innerText = "【エラー】SQLエンジンの初期化に失敗しました: " + err.message;
+            // 1. 譜面定数CSVの読み込み
+            Papa.parse("hakkyoudata.csv", {
+                download: true,
+                header: true,
+                complete: function (results) {
+                    csvData = results.data;
+                    isCsvReady = true;
+                    checkReadyStatus();
+                },
+                error: function (err) {
+                    statusEl.innerText = "【エラー】hakkyoudata.csv の読み込みに失敗しました。";
+                }
             });
-        } else {
-            statusEl.innerText = "【エラー】sql-wasm.js が正しく読み込めていません。同階層にファイルを配置してください。";
-        }
 
-        function calcSingleRating(exScore, maxScore, difficulty) {
-            if (!exScore || !maxScore || !difficulty || maxScore == 0 || exScore == 0) return 0;
-            let rate = (exScore / maxScore) * 100;
-            let base = (difficulty * rate / 100.0) + ((rate - 88.8888) * 0.5);
-            let b1 = (rate >= 88.8888) ? 1.5 : 0.0;
-            let b2 = (rate >= 94.4444) ? 1.5 : 0.0;
-            let b3 = (rate >= 99.0000) ? 2.0 : 0.0;
-            return base + b1 + b2 + b3;
-        }
+            // 2. 自分のリポジトリ内にあるファイルから sql.js を初期化
+            if (typeof initSqlJs !== 'undefined') {
+                initSqlJs({ locateFile: file => file }).then(function (js) {
+                    SQL = js;
+                    isSqlReady = true;
+                    checkReadyStatus();
+                }).catch(function (err) {
+                    statusEl.innerText = "【エラー】SQLエンジンの初期化に失敗しました: " + err.message;
+                });
+            } else {
+                statusEl.innerText = "【エラー】sql-wasm.js が正しく読み込めていません。同階層にファイルを配置してください。";
+            }
 
-        document.getElementById('dbfile').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (!file || !SQL) return;
+            function calcSingleRating(exScore, maxScore, difficulty) {
+                if (!exScore || !maxScore || !difficulty || maxScore == 0 || exScore == 0) return 0;
+                let rate = (exScore / maxScore) * 100;
+                let base = (difficulty * rate / 100.0) + ((rate - AAA_BORDER) * 0.5);
+                let b1 = (rate >= AAA_BORDER) ? 1.5 : 0.0;
+                let b2 = (rate >= MAX_MIN_BORDER) ? 1.5 : 0.0;
+                return base + b1 + b2;
+            }
 
-            statusEl.innerText = "選択されたファイル: " + file.name;
-            document.getElementById('loading-text').style.display = "block";
+            document.getElementById('dbfile').addEventListener('change', function (e) {
+                const file = e.target.files[0];
+                if (!file || !SQL) return;
 
-            const reader = new FileReader();
-            reader.onload = function() {
-                const Uints = new Uint8Array(reader.result);
-                try {
-                    const db = new SQL.Database(Uints);
-                    
-                    const tableRes = db.exec("SELECT name FROM sqlite_master WHERE type='table';");
-                    if (tableRes.length === 0) {
-                        alert("有効なSQLiteデータベースではありません。");
-                        document.getElementById('loading-text').style.display = "none";
-                        return;
-                    }
-                    const tables = tableRes[0].values.map(row => row[0].toLowerCase());
-                    
-                    let targetTable = "";
-                    if (tables.includes("scorelog")) targetTable = "scorelog";
-                    else if (tables.includes("score")) targetTable = "score";
-                    else if (tables.includes("clear")) targetTable = "clear";
-                    
-                    if (!targetTable) {
-                        alert("対応するスコアテーブル（scorelog, score, clear）が見つかりません。");
-                        document.getElementById('loading-text').style.display = "none";
-                        return;
-                    }
+                statusEl.innerText = "選択されたファイル: " + file.name;
+                document.getElementById('loading-text').style.display = "block";
 
-                    const colRes = db.exec(`PRAGMA table_info(${targetTable});`);
-                    const existingCols = colRes[0].values.map(row => row[1].toLowerCase());
-                    
-                    let hashCol = "sha256";
-                    if (existingCols.includes("hash")) hashCol = "hash";
+                const reader = new FileReader();
+                reader.onload = function () {
+                    const Uints = new Uint8Array(reader.result);
+                    try {
+                        const db = new SQL.Database(Uints);
 
-                    let pgCol = "";
-                    for (let target of ['epg', 'perfect', 'pgreat']) {
-                        if (existingCols.includes(target)) { pgCol = target; break; }
-                    }
-                    let grCol = "";
-                    for (let target of ['eg', 'great']) {
-                        if (existingCols.includes(target)) { grCol = target; break; }
-                    }
+                        const tableRes = db.exec("SELECT name FROM sqlite_master WHERE type='table';");
+                        if (tableRes.length === 0) {
+                            alert("有効なSQLiteデータベースではありません。");
+                            document.getElementById('loading-text').style.display = "none";
+                            return;
+                        }
+                        const tables = tableRes[0].values.map(row => row[0].toLowerCase());
 
-                    let query = "";
-                    if (pgCol && grCol) {
-                        if (targetTable === "scorelog") {
-                            query = `SELECT ${hashCol} as bms_hash, MAX(CAST(${pgCol} AS INTEGER) * 2 + CAST(${grCol} AS INTEGER)) as ex_score FROM scorelog GROUP BY ${hashCol}`;
+                        let targetTable = "";
+                        if (tables.includes("scorelog")) targetTable = "scorelog";
+                        else if (tables.includes("score")) targetTable = "score";
+                        else if (tables.includes("clear")) targetTable = "clear";
+
+                        if (!targetTable) {
+                            alert("対応するスコアテーブル（scorelog, score, clear）が見つかりません。");
+                            document.getElementById('loading-text').style.display = "none";
+                            return;
+                        }
+
+                        const colRes = db.exec(`PRAGMA table_info(${targetTable});`);
+                        const existingCols = colRes[0].values.map(row => row[1].toLowerCase());
+
+                        let hashCol = "sha256";
+                        if (existingCols.includes("hash")) hashCol = "hash";
+
+                        let pgCol = "";
+                        for (let target of ['epg', 'perfect', 'pgreat']) {
+                            if (existingCols.includes(target)) { pgCol = target; break; }
+                        }
+                        let grCol = "";
+                        for (let target of ['eg', 'great']) {
+                            if (existingCols.includes(target)) { grCol = target; break; }
+                        }
+
+                        let query = "";
+                        if (pgCol && grCol) {
+                            if (targetTable === "scorelog") {
+                                query = `SELECT ${hashCol} as bms_hash, MAX(CAST(${pgCol} AS INTEGER) * 2 + CAST(${grCol} AS INTEGER)) as ex_score FROM scorelog GROUP BY ${hashCol}`;
+                            } else {
+                                query = `SELECT ${hashCol} as bms_hash, (CAST(${pgCol} AS INTEGER) * 2 + CAST(${grCol} AS INTEGER)) as ex_score FROM ${targetTable}`;
+                            }
                         } else {
-                            query = `SELECT ${hashCol} as bms_hash, (CAST(${pgCol} AS INTEGER) * 2 + CAST(${grCol} AS INTEGER)) as ex_score FROM ${targetTable}`;
-                        }
-                    } else {
-                        let fallbackCol = "";
-                        for (let target of ['exscore', 'ep', 'score', 'ex_score']) {
-                            if (existingCols.includes(target)) { fallbackCol = target; break; }
-                        }
-                        if (!fallbackCol) fallbackCol = existingCols[1] || existingCols[0];
-                        
-                        if (targetTable === "scorelog") {
-                            query = `SELECT ${hashCol} as bms_hash, MAX(CAST(${fallbackCol} AS INTEGER)) as ex_score FROM scorelog GROUP BY ${hashCol}`;
-                        } else {
-                            query = `SELECT ${hashCol} as bms_hash, CAST(${fallbackCol} AS INTEGER) as ex_score FROM ${targetTable}`;
-                        }
-                    }
+                            let fallbackCol = "";
+                            for (let target of ['exscore', 'ep', 'score', 'ex_score']) {
+                                if (existingCols.includes(target)) { fallbackCol = target; break; }
+                            }
+                            if (!fallbackCol) fallbackCol = existingCols[1] || existingCols[0];
 
-                    const dbResult = db.exec(query);
-                    let userScores = {};
-                    let isMd5Mode = false;
+                            if (targetTable === "scorelog") {
+                                query = `SELECT ${hashCol} as bms_hash, MAX(CAST(${fallbackCol} AS INTEGER)) as ex_score FROM scorelog GROUP BY ${hashCol}`;
+                            } else {
+                                query = `SELECT ${hashCol} as bms_hash, CAST(${fallbackCol} AS INTEGER) as ex_score FROM ${targetTable}`;
+                            }
+                        }
 
-                    if (dbResult.length > 0) {
-                        const rows = dbResult[0].values;
-                        rows.forEach(row => {
-                            let hash = row[0] ? row[0].toLowerCase().trim() : "";
-                            let exScore = parseInt(row[1]) || 0;
-                            if(hash) {
-                                userScores[hash] = exScore;
-                                if (hash.length === 32) isMd5Mode = true;
+                        const dbResult = db.exec(query);
+                        let userScores = {};
+                        let isMd5Mode = false;
+
+                        if (dbResult.length > 0) {
+                            const rows = dbResult[0].values;
+                            rows.forEach(row => {
+                                let hash = row[0] ? row[0].toLowerCase().trim() : "";
+                                let exScore = parseInt(row[1]) || 0;
+                                if (hash) {
+                                    userScores[hash] = exScore;
+                                    if (hash.length === 32) isMd5Mode = true;
+                                }
+                            });
+                        }
+
+                        let calculatedList = [];
+                        let csvKeys = csvData.length > 0 ? Object.keys(csvData[0]).map(k => k.toLowerCase()) : [];
+                        let csvHashKey = "sha256";
+                        if (isMd5Mode) {
+                            if (csvKeys.includes("md5")) csvHashKey = "md5";
+                            else if (csvKeys.includes("hash")) csvHashKey = "hash";
+                        }
+
+                        let aaaCount = 0;
+                        let maxMinusCount = 0;
+                        csvData.forEach(item => {
+                            let rawKey = Object.keys(item).find(k => k.toLowerCase() === csvHashKey) || "sha256";
+                            let hash = item[rawKey] ? item[rawKey].toLowerCase().trim() : "";
+
+                            if (userScores[hash] !== undefined) {
+                                let exScore = userScores[hash];
+                                let maxScore = parseFloat(item.max_score) || 0;
+                                let difficulty = parseFloat(item.difficulty) || 0;
+
+                                let rate = (exScore / maxScore) * 100;
+                                if (rate >= MAX_MIN_BORDER) maxMinusCount++;
+                                if (rate >= AAA_BORDER) aaaCount++;
+
+                                let singleRating = calcSingleRating(exScore, maxScore, difficulty);
+                                if (singleRating > 0) {
+                                    calculatedList.push({
+                                        level: item.level || "-",
+                                        title: item.title || "Unknown Title",
+                                        ex_score: exScore,
+                                        max_score: maxScore,
+                                        difficulty: difficulty,
+                                        single_rating: singleRating
+                                    });
+                                }
                             }
                         });
-                    }
 
-                    let calculatedList = [];
-                    let csvKeys = csvData.length > 0 ? Object.keys(csvData[0]).map(k => k.toLowerCase()) : [];
-                    let csvHashKey = "sha256";
-                    if (isMd5Mode) {
-                        if (csvKeys.includes("md5")) csvHashKey = "md5";
-                        else if (csvKeys.includes("hash")) csvHashKey = "hash";
-                    }
+                        calculatedList.sort((a, b) => b.single_rating - a.single_rating);
+                        let best50 = calculatedList.slice(0, 50);
 
-                    csvData.forEach(item => {
-                        let rawKey = Object.keys(item).find(k => k.toLowerCase() === csvHashKey) || "sha256";
-                        let hash = item[rawKey] ? item[rawKey].toLowerCase().trim() : "";
-                        
-                        if (userScores[hash] !== undefined) {
-                            let exScore = userScores[hash];
-                            let maxScore = parseFloat(item.max_score) || 0;
-                            let difficulty = parseFloat(item.difficulty) || 0;
-                            let singleRating = calcSingleRating(exScore, maxScore, difficulty);
-                            if (singleRating > 0) {
-                                calculatedList.push({
-                                    level: item.level || "-",
-                                    title: item.title || "Unknown Title",
-                                    ex_score: exScore,
-                                    max_score: maxScore,
-                                    difficulty: difficulty,
-                                    single_rating: singleRating
-                                });
+                        if (best50.length === 0) {
+                            let errorMsg = "CSVデータと一致するスコアが1曲も見つかりませんでした。\n\n";
+                            if (isMd5Mode) {
+                                errorMsg += "【原因の可能性】LR2.dbが読み込まれましたが、'hakkyoudata.csv' 側に 'md5'（または 'hash'）という列が存在しないか、空欄になっている可能性があります。";
+                            } else {
+                                errorMsg += "beatorajaのDBが読み込まれましたが、CSV側の 'sha256' 列と一致しませんでした。";
                             }
+                            alert(errorMsg);
+                            document.getElementById('loading-text').style.display = "none";
+                            return;
                         }
-                    });
 
-                    calculatedList.sort((a, b) => b.single_rating - a.single_rating);
-                    let best50 = calculatedList.slice(0, 50);
-
-                    if (best50.length === 0) {
-                        let errorMsg = "CSVデータと一致するスコアが1曲も見つかりませんでした。\n\n";
-                        if (isMd5Mode) {
-                            errorMsg += "【原因の可能性】LR2.dbが読み込まれましたが、'hakkyoudata.csv' 側に 'md5'（または 'hash'）という列が存在しないか、空欄になっている可能性があります。";
-                        } else {
-                            errorMsg += "beatorajaのDBが読み込まれましたが、CSV側の 'sha256' 列と一致しませんでした。";
-                        }
-                        alert(errorMsg);
-                        document.getElementById('loading-text').style.display = "none";
-                        return;
-                    }
-
-                    let totalRating = 0;
-                    let tableHtml = "";
-                    best50.forEach((row, index) => {
-                        totalRating += row.single_rating;
-                        let ratePercent = ((row.ex_score / row.max_score) * 100).toFixed(2);
-                        tableHtml += `
+                        let totalRating = 0;
+                        let tableHtml = "";
+                        best50.forEach((row, index) => {
+                            totalRating += row.single_rating;
+                            let ratePercent = ((row.ex_score / row.max_score) * 100).toFixed(2);
+                            tableHtml += `
                             <tr>
                                 <td class="rank">${index + 1}</td>
                                 <td class="center level-tag">${row.level}</td>
@@ -270,22 +417,25 @@
                                 <td class="center single-rate">${row.single_rating.toFixed(4)}</td>
                             </tr>
                         `;
-                    });
+                        });
 
-                    document.getElementById('total-rating').innerText = Math.floor(totalRating);
-                    document.getElementById('table-body').innerHTML = tableHtml;
-                    document.getElementById('result-box').style.display = "block";
-                    document.getElementById('result-table').style.display = "table";
-                    document.getElementById('loading-text').style.display = "none";
+                        document.getElementById('total-rating').innerText = Math.floor(totalRating + maxMinusCount);
+                        document.getElementById('aaa-count').innerText = aaaCount;
+                        document.getElementById('max-minus-count').innerText = maxMinusCount;
+                        document.getElementById('table-body').innerHTML = tableHtml;
+                        document.getElementById('result-box').style.display = "block";
+                        document.getElementById('result-table').style.display = "table";
+                        document.getElementById('loading-text').style.display = "none";
 
-                } catch (error) {
-                    alert("解析中にエラーが発生しました:\n" + error.message);
-                    document.getElementById('loading-text').style.display = "none";
-                }
-            };
-            reader.readAsArrayBuffer(file);
+                    } catch (error) {
+                        alert("解析中にエラーが発生しました:\n" + error.message);
+                        document.getElementById('loading-text').style.display = "none";
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            });
         });
-    });
-</script>
+    </script>
 </body>
+
 </html>
