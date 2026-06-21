@@ -159,7 +159,8 @@
             color: #1976d2;
         }
 
-        .diff-val {
+        .diff-val,
+        .rate-val {
             display: block;
             font-size: 10px;
             margin-top: 2px;
@@ -176,6 +177,24 @@
 
         .diff-same {
             color: #d69e2e;
+        }
+
+        .rate-orange {
+            color: #ed8936;
+        }
+
+        .rate-yellow {
+            color: #ecc94b;
+        }
+
+        .rate-red {
+            color: #e53e3e;
+        }
+
+        .rating-highlight {
+            color: #ecc94b;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
         }
 
         .loading {
@@ -330,7 +349,7 @@
 
         <div class="tabs">
             <button class="tab-btn active" onclick="switchTab('rating')">レーティング計算</button>
-            <button class="tab-btn" onclick="switchTab('chart')">譜面定数表</button>
+            <button class="tab-btn" onclick="switchTab('chart')">RECORDS</button>
         </div>
 
         <!-- レーティング計算タブ -->
@@ -377,8 +396,9 @@
             </table>
         </div>
 
-        <!-- 譜面定数表タブ -->
+        <!-- RECORDSタブ -->
         <div id="chart-tab" class="tab-content">
+            <h2 class="center">RECORDS</h2>
             <div class="search-container">
                 <input type="text" id="search-input" class="search-input" placeholder="曲名やレベルで検索...">
             </div>
@@ -397,6 +417,7 @@
                         <th onclick="changeSort('title')">曲名</th>
                         <th class="center" style="width: 70px;" onclick="changeSort('difficulty')">譜面定数</th>
                         <th class="center" style="width: 90px;" onclick="changeSort('best')">自己ベスト</th>
+                        <th class="center" style="width: 90px;" onclick="changeSort('single_rating')">レーティング</th>
                         <th class="center" style="width: 90px;" onclick="changeSort('aaa')">AAAボーダー</th>
                         <th class="center" style="width: 90px;" onclick="changeSort('max_min')">MAX-ボーダー</th>
                         <th class="center" style="width: 70px;" onclick="changeSort('max_score')">MAX</th>
@@ -413,6 +434,7 @@
             let SQL = null;
             let csvData = [];
             let userScores = {}; // スコアを共有変数化
+            let best50Hashes = new Set(); // Best 50に入っている譜面
             let currentHashKey = "sha256"; // 現在使用しているハッシュの種類
 
             let isCsvReady = false;
@@ -749,10 +771,16 @@
                             valB = b.title || "";
                             break;
                         case 'best':
-                            const hashA = (a[Object.keys(a).find(k => k.toLowerCase() === currentHashKey)] || "").toLowerCase().trim();
-                            const hashB = (b[Object.keys(b).find(k => k.toLowerCase() === currentHashKey)] || "").toLowerCase().trim();
-                            valA = userScores[hashA] || 0;
-                            valB = userScores[hashB] || 0;
+                            const hashBestA = (a[Object.keys(a).find(k => k.toLowerCase() === currentHashKey)] || "").toLowerCase().trim();
+                            const hashBestB = (b[Object.keys(b).find(k => k.toLowerCase() === currentHashKey)] || "").toLowerCase().trim();
+                            valA = userScores[hashBestA] || 0;
+                            valB = userScores[hashBestB] || 0;
+                            break;
+                        case 'single_rating':
+                            const hA = (a[Object.keys(a).find(k => k.toLowerCase() === currentHashKey)] || "").toLowerCase().trim();
+                            const hB = (b[Object.keys(b).find(k => k.toLowerCase() === currentHashKey)] || "").toLowerCase().trim();
+                            valA = userScores[hA] ? calcSingleRating(userScores[hA], parseFloat(a.difficulty) || 0, parseInt(a.max_score) || 0) : 0;
+                            valB = userScores[hB] ? calcSingleRating(userScores[hB], parseFloat(b.difficulty) || 0, parseInt(b.max_score) || 0) : 0;
                             break;
                         case 'aaa':
                             valA = Math.ceil((parseInt(a.max_score) || 0) * 8 / 9);
@@ -818,6 +846,17 @@
                     const hash = row[rawKey] ? row[rawKey].toLowerCase().trim() : "";
                     const best = userScores[hash] !== undefined ? userScores[hash] : null;
 
+                    const rateVal = best !== null ? (best / maxScore * 100).toFixed(2) : null;
+                    let rateClass = "";
+                    if (rateVal !== null) {
+                        if (rateVal >= 94.4444) rateClass = "rate-red";
+                        else if (rateVal >= 88.8888) rateClass = "rate-yellow";
+                        else rateClass = "rate-orange";
+                    }
+
+                    const singleRating = best !== null ? calcSingleRating(best, parseFloat(row.difficulty) || 0, maxScore) : 0;
+                    const isBest50 = best50Hashes.has(hash);
+
                     const getDiffHtml = (score, border) => {
                         if (score === null || !border) return "";
                         const diff = score - border;
@@ -833,7 +872,11 @@
                                 <a href="${irUrl}" target="_blank" class="chart-link">${title}</a>
                             </td>
                             <td class="center">${difficulty}</td>
-                            <td class="center">${best !== null ? best : "-"}</td>
+                            <td class="center">
+                                ${best !== null ? best : "-"}
+                                ${rateVal !== null ? `<span class="rate-val ${rateClass}">${rateVal}%</span>` : ""}
+                            </td>
+                            <td class="center ${isBest50 ? 'rating-highlight' : ''}">${singleRating > 0 ? singleRating.toFixed(2) : "-"}</td>
                             <td class="center">
                                 ${aaaBorder || "-"}
                                 ${getDiffHtml(best, aaaBorder)}
